@@ -60,3 +60,78 @@ For a quick smoke test, set `EPOCHS_HEAD = 1` and `EPOCHS_FT = 0` in the config 
 ## MPS vs CPU/CUDA
 
 Small numerical differences between Metal (MPS), CUDA, and CPU are normal; test accuracy should still agree within about 1–2%.
+
+---
+
+## Phase C — FastAPI inference API
+
+### Setup
+
+From the **repository root** (activate your venv, or create a fresh one):
+
+```bash
+pip install -r fish-classifier/requirements-api.txt
+```
+
+Copy env defaults (paths work when running from `fish-classifier/`):
+
+```bash
+cp fish-classifier/.env.example fish-classifier/.env
+```
+
+### Run
+
+From `fish-classifier/`:
+
+```bash
+uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
+```
+
+- `GET  http://127.0.0.1:8000/health` — liveness check
+- `POST http://127.0.0.1:8000/predict` — multipart form, field name **`file`**
+
+### Smoke test
+
+```bash
+curl -sS -F "file=@/path/to/sample.jpg" http://127.0.0.1:8000/predict
+# {"label":"Salmon","confidence":0.972}
+
+# optional top-k
+curl -sS -F "file=@/path/to/sample.jpg" "http://127.0.0.1:8000/predict?top_k=5"
+```
+
+### Environment variables
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `MODEL_PATH` | `models/fish_model.pt` | Path to trained checkpoint |
+| `CLASS_NAMES_PATH` | `models/class_names.json` | Path to class names JSON |
+| `CORS_ORIGINS` | `http://localhost:3000` | Comma-separated allowed origins (include Phase D dev origin) |
+
+---
+
+## Phase D — Next.js frontend
+
+### Setup (second terminal)
+
+```bash
+cd fish-classifier/web
+cp .env.local.example .env.local
+npm install
+npm run dev
+```
+
+Open `http://localhost:3000`. Keep the Phase C API running on port 8000 in the first terminal.
+
+### How it works
+
+- Choose an image → click **Classify** → the browser posts the file directly to `NEXT_PUBLIC_API_URL/predict`
+- Displays the top prediction label, confidence bar, and a ranked top-5 list
+
+### LAN testing
+
+If the browser is on a different host than the API, add the browser origin to `CORS_ORIGINS` in `fish-classifier/.env`:
+
+```
+CORS_ORIGINS=http://localhost:3000,http://192.168.1.x:3000
+```
